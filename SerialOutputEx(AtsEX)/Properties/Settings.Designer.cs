@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace SerialOutputEx.Properties {
+namespace SeldEX.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
@@ -20,6 +20,54 @@ namespace SerialOutputEx.Properties {
         public static Settings Default {
             get {
                 return defaultInstance;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool IsStartingNotchSet {
+            get {
+                return ((bool)(this["IsStartingNotchSet"]));
+            }
+            set {
+                this["IsStartingNotchSet"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UseAutoBrake {
+            get {
+                return ((bool)(this["UseAutoBrake"]));
+            }
+            set {
+                this["UseAutoBrake"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IsUseAutoNotchFit {
+            get {
+                return ((bool)(this["IsUseAutoNotchFit"]));
+            }
+            set {
+                this["IsUseAutoNotchFit"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UseAutoAirEX {
+            get {
+                return ((bool)(this["UseAutoAirEX"]));
+            }
+            set {
+                this["UseAutoAirEX"] = value;
             }
         }
     }
