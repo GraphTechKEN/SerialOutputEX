@@ -14,11 +14,14 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Reflection;
 using TypeWrapping;
-using ObjectiveHarmonyPatch;
+//using ObjectiveHarmonyPatch;
 using System.Linq;
 using System.Threading.Tasks;
+using HarmonyLib;
+using SerialOutputEx;
+using System.Diagnostics.Eventing.Reader;
 
-namespace SeldEX
+namespace SerialOutputEx
 {
     [PluginType(PluginType.Extension)]
     [HideExtensionMain]
@@ -26,7 +29,7 @@ namespace SeldEX
     {
 
         private SerialPort serialPort;
-        
+
         private bool Debug = false;
         private OutputInfo outputInfo = new OutputInfo();
 
@@ -105,14 +108,14 @@ namespace SeldEX
         private string dir;
 
         private readonly HarmonyPatch Patch;
-        PatchInvokedEventHandler BcChangeHandler;
+        //PatchInvokedEventHandler BcChangeHandler;
         private int targetBcValue = 0;
         private bool flgBcChangeMode = false;
         private bool flgFirstBoot = true;
 
         public PluginMain(PluginBuilder builder) : base(builder)
         {
-            ClassMemberSet carBrakeMembers = BveHacker.BveTypes.GetClassInfoOf<CarBrake>();
+            /*ClassMemberSet carBrakeMembers = BveHacker.BveTypes.GetClassInfoOf<CarBrake>();
             MethodInfo tickMethod = carBrakeMembers.OriginalType.GetMethods().First(m =>
             {
                 ParameterInfo[] parameters = m.GetParameters();
@@ -126,7 +129,7 @@ namespace SeldEX
                 instance.BcValve.TargetPressure.Value = targetBcValue * 1000;
 
                 return PatchInvokationResult.DoNothing(e);
-            };
+            };*/
 
             //0.4.31219.1 追記
             Extensions.AllExtensionsLoaded += Extensions_AllExtensionsLoaded;
@@ -139,11 +142,11 @@ namespace SeldEX
             tsiOutput = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("SerialOutputEx 連動", SerialOutputEx_Change, ContextMenuItemType.CoreAndExtensions);
             tsiConsole = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("デバッグコンソール 表示", DebugConsoleDisp_Change, ContextMenuItemType.CoreAndExtensions);
             tsiOpenEditor = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("SerialOutputEx 設定", SerialOutputExEdit_Open, ContextMenuItemType.CoreAndExtensions);
-            tsiStartingNotchSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("シナリオ開始時 ノッチ設定転送", SerialOutputExStartingNotchSet_Change, ContextMenuItemType.CoreAndExtensions);
-            tsiAutoBrakeSettings = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("自動ブレーキ帯 設定", null, ContextMenuItemType.CoreAndExtensions);
-            tsiAutoBrakeSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ブレーキ帯 使用", AutoBrakeSet_Change, ContextMenuItemType.CoreAndExtensions);
-            tsiAutoAirEX = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("BveEX使用", AutoBrakeEX_Change, ContextMenuItemType.CoreAndExtensions);
-            tsiAutoNotchFit = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ノッチ合わせ", AutoNotchFit_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiStartingNotchSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("シナリオ開始時 ノッチ設定転送", SerialOutputExStartingNotchSet_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoBrakeSettings = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("自動ブレーキ帯 設定", null, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoBrakeSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ブレーキ帯 使用", AutoBrakeSet_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoAirEX = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("BveEX使用", AutoBrakeEX_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoNotchFit = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ノッチ合わせ", AutoNotchFit_Change, ContextMenuItemType.CoreAndExtensions);
             tsiSettings = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("SerialOutputEx 設定", null, ContextMenuItemType.CoreAndExtensions);
             tsiSetSettingFile = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("設定ファイルの選択", SetSettingFile_Click, ContextMenuItemType.CoreAndExtensions);
             tsiSeperator = Extensions.GetExtension<IContextMenuHacker>().AddSeparator(0);
@@ -257,7 +260,7 @@ namespace SeldEX
             {
                 if (!serialPort.IsOpen)
                 {
-                    Task open = Open(portName,false);
+                    Task open = Open(portName, false);
                 }
             }
             else
@@ -345,22 +348,22 @@ namespace SeldEX
             tsiSettings.DropDownItems.Add(tsiOpenEditor);
             tsiSettings.DropDownItems.Add(tss);
             tsiSettings.DropDownItems.Add(tsiConsole);
-            tsiSettings.DropDownItems.Add(tsiStartingNotchSet);
-            tsiSettings.DropDownItems.Add(tsiAutoBrakeSettings);
-            tsiSettings.DropDownItems.Add(tsiAutoNotchFit);
+            //tsiSettings.DropDownItems.Add(tsiStartingNotchSet);
+            //tsiSettings.DropDownItems.Add(tsiAutoBrakeSettings);
+            //tsiSettings.DropDownItems.Add(tsiAutoNotchFit);
             tsiOpenEditor.DropDownItems.Add(tsiSetSettingFile);
-            tsiAutoBrakeSettings.DropDownItems.Add(tsiAutoBrakeSet);
-            tsiAutoBrakeSettings.DropDownItems.Add(tsiAutoAirEX);
+            //tsiAutoBrakeSettings.DropDownItems.Add(tsiAutoBrakeSet);
+            //tsiAutoBrakeSettings.DropDownItems.Add(tsiAutoAirEX);
 
             tsiOutput.Enabled = !flgScenarioOpened;
             tsiOutput.Checked = serialPort.IsOpen;
             tsiOutput.Text = serialPort.IsOpen ? "SerialOutputEx 連動 (" + serialPort.PortName + ")" : "SerialOutputEx 連動";
 
-            tsiStartingNotchSet.Enabled = tsiOutput.Checked;
+            /*tsiStartingNotchSet.Enabled = tsiOutput.Checked;
             tsiAutoBrakeSet.Enabled = tsiOutput.Checked;
             tsiAutoNotchFit.Enabled = tsiOutput.Checked;
             tsiAutoBrakeSettings.Enabled = tsiOutput.Checked;
-            tsiAutoAirEX.Enabled = tsiOutput.Checked;
+            tsiAutoAirEX.Enabled = tsiOutput.Checked;*/
 
             if (!flgScenarioOpened)
             {
@@ -497,7 +500,7 @@ namespace SeldEX
                 IsUseAutoNotchFit = Properties.Settings.Default.IsUseAutoNotchFit;
                 IsUseAutoAirEX = Properties.Settings.Default.UseAutoAirEX;
 
-                tsiStartingNotchSet.Checked = IsStartingNotchSet;
+                /*tsiStartingNotchSet.Checked = IsStartingNotchSet;
                 tsiAutoBrakeSet.Checked = IsUseAutoBrake;
                 tsiAutoNotchFit.Checked = IsUseAutoNotchFit;
                 tsiAutoAirEX.Checked = IsUseAutoAirEX;
@@ -506,7 +509,7 @@ namespace SeldEX
                 tsiAutoBrakeSet.Enabled = tsiOutput.Checked;
                 tsiAutoNotchFit.Enabled = tsiOutput.Checked;
                 tsiAutoBrakeSettings.Enabled = tsiOutput.Checked;
-                tsiAutoAirEX.Enabled = tsiOutput.Checked;
+                tsiAutoAirEX.Enabled = tsiOutput.Checked;*/
                 //Properties.Settings.Default.Reload();
             }
             string stTarget = Assembly.GetExecutingAssembly().CodeBase;
@@ -582,7 +585,7 @@ namespace SeldEX
         /// <param name="_portName">ポート名</param>
         /// <param name="_anotherPortOpen">他のポートを開く場合</param>
         /// <returns></returns>
-        private string OutputOpen(string path , string _portName , bool _anotherPortOpen)
+        private string OutputOpen(string path, string _portName, bool _anotherPortOpen)
         {
 
             //XmlSerializerオブジェクトを作成
@@ -633,7 +636,7 @@ namespace SeldEX
             }
             catch (IOException)
             {
-                MessageShow("シリアルポート " + serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。" );
+                MessageShow("シリアルポート " + serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。");
             }
             catch (Exception ex)
             {
@@ -667,11 +670,11 @@ namespace SeldEX
             Properties.Settings.Default.Save();
 
 
-            if (flgBcChangeMode)
+            /*if (flgBcChangeMode)
             {
                 Patch.Invoked -= BcChangeHandler;
             }
-            Patch.Dispose();
+            Patch.Dispose();*/
         }
 
         public override TickResult Tick(TimeSpan elapsed)
@@ -888,7 +891,7 @@ namespace SeldEX
             {
                 string indata = sp.ReadLine();
                 ConsoleWrite("受信:" + indata);
-                if (indata.StartsWith("BC"))
+                /*if (indata.StartsWith("BC"))
                 {
                     int.TryParse(indata.Substring(3), out targetBcValue);
                 }
@@ -909,7 +912,7 @@ namespace SeldEX
                         Patch.Invoked -= BcChangeHandler;
                         ConsoleWrite("BC変更　解除");
                     }
-                }
+                }*/
             }
             catch
             {

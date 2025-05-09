@@ -163,10 +163,11 @@
   <Import Project="..\CommonResource\CommonResource.projitems" Label="Shared" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>xcopy /y "$(TargetPath)" C:\Users\Public\Documents\AtsEx\1.0\Extensions
-xcopy /y "$(TargetPath)" C:\Users\Public\Documents\BveEx\Legacy\Extensions
-mkdir "$(TargetPath)" $(SolutionDir)bin\BveEx\Legacy\Extensions
-xcopy /y "$(TargetPath)" $(SolutionDir)bin\BveEx\Legacy\Extensions</PostBuildEvent>
+    <PostBuildEvent>xcopy /Y "$(TargetPath)" "C:\Users\Public\Documents\AtsEx\1.0\Extensions\"
+xcopy /Y "$(TargetPath)" "C:\Users\Public\Documents\BveEx\Legacy\Extensions\"
+mkdir /C /E /H "$(TargetPath)" "$(SolutionDir)..\BveEx\Legacy\Extensions\"
+xcopy /Y "$(TargetPath)" "$(SolutionDir)..\BveEx\Legacy\Extensions\"
+</PostBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
     <DllExportIdent>65C8A9CF-CDA3-4651-82A2-EF4D34F5721F</DllExportIdent>
