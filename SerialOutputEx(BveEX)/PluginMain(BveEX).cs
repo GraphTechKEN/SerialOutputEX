@@ -4,6 +4,7 @@ using System.IO.Ports;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Serialization;
+
 using BveTypes.ClassWrappers;
 using BveEx.PluginHost.Plugins;
 using BveEx.PluginHost.Plugins.Extensions;
@@ -12,6 +13,13 @@ using BveEx.PluginHost;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Reflection;
+using TypeWrapping;
+//using ObjectiveHarmonyPatch;
+using System.Linq;
+using System.Threading.Tasks;
+using HarmonyLib;
+using SerialOutputEx;
+using System.Diagnostics.Eventing.Reader;
 
 namespace SerialOutputEx
 {
@@ -19,103 +27,129 @@ namespace SerialOutputEx
     [HideExtensionMain]
     internal class PluginMain : AssemblyPluginBase, IExtension
     {
-        //シリアルポート
+
         private SerialPort serialPort;
-        private string portName = "";
 
-        //デバッグコンソール
-        private DebugConsole dc = new DebugConsole();
         private bool Debug = false;
-
-        //出力設定
         private OutputInfo outputInfo = new OutputInfo();
+
         private string str_send_latch = "";
         private DateTime dateTime;
-        private bool flgScenarioOpened = false;
-        private bool flgFirstSend = false;
-        private bool flgConsoleOpened = false;
 
-        //設定ファイル
+        private bool flgScenarioOpened = false;
+
+        private bool flgFirstSend = false;
+
+        private bool flgConsoleOpened = false;
+        /// <summary>
+        /// デバッグコンソールのインスタンス
+        /// </summary>
+        private DebugConsole dc = new DebugConsole();
+        /// <summary>
+        /// SerialOutputEx連動メニュー 
+        /// </summary>
+        private ToolStripMenuItem tsiOutput;
+        /// <summary>
+        /// デバッグコンソール表示メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiConsole;
+        /// <summary>
+        /// ポート選択メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiPorts;
+        /// <summary>
+        /// シリアル出力エディタ起動メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiOpenEditor;
+        /// <summary>
+        /// 開始時ノッチセットメニュー
+        /// </summary>
+        private ToolStripMenuItem tsiStartingNotchSet;
+        /// <summary>
+        /// 自動ブレーキ帯設定メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiAutoBrakeSettings;
+        /// <summary>
+        /// 自動ブレーキ帯使用メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiAutoBrakeSet;
+        /// <summary>
+        /// BveEX使用メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiAutoAirEX;
+        /// <summary>
+        /// 自動ノッチ合わせ設定メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiAutoNotchFit;
+        /// <summary>
+        /// SerialOutputEx設定メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiSettings;
+        /// <summary>
+        /// 設定ファイルの選択メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiSetSettingFile;
+        private ToolStripSeparator tsiSeperator;
+
+        private string portName = "";
         private string editorPath = "";
         private string editorPathV1_1 = "";
+
+        private bool IsStartingNotchSet = false;
+
+        private bool flgAutoBrakeSetChange = false;
+        private bool flgAutoNotchFitChange = false;
+        private bool flgAutoAirEXChange = false;
+        private bool IsUseAutoBrake = false;
+        private bool IsUseAutoNotchFit = false;
+        private bool IsUseAutoAirEX = false;
         private string xmlpath;
+
         private string dir;
 
-        //コンテクストメニュー
-        private ToolStripMenuItem tsiOutput;
-        private ToolStripMenuItem tsiConsole;
-        private ToolStripMenuItem tsiPorts;
-        private ToolStripMenuItem tsiOpenEditor;
-        private ToolStripMenuItem tsiSettings;
-        //private ToolStripMenuItem tsiSetSettingFile;
-        private ToolStripSeparator tsiSeperator;
+        private readonly HarmonyPatch Patch;
+        //PatchInvokedEventHandler BcChangeHandler;
+        private int targetBcValue = 0;
+        private bool flgBcChangeMode = false;
+        private bool flgFirstBoot = true;
 
         public PluginMain(PluginBuilder builder) : base(builder)
         {
+            /*ClassMemberSet carBrakeMembers = BveHacker.BveTypes.GetClassInfoOf<CarBrake>();
+            MethodInfo tickMethod = carBrakeMembers.OriginalType.GetMethods().First(m =>
+            {
+                ParameterInfo[] parameters = m.GetParameters();
+                return parameters.Length == 1 && parameters[0].ParameterType == typeof(double);
+            });
 
+            Patch = HarmonyPatch.Patch(null, tickMethod, PatchType.Prefix);
+            BcChangeHandler = (sender, e) =>
+            {
+                CarBrake instance = CarBrake.FromSource(e.Instance);
+                instance.BcValve.TargetPressure.Value = targetBcValue * 1000;
+
+                return PatchInvokationResult.DoNothing(e);
+            };*/
+
+            //0.4.31219.1 追記
             Extensions.AllExtensionsLoaded += Extensions_AllExtensionsLoaded;
-
-            string stTarget = Assembly.GetExecutingAssembly().CodeBase;
-            string dllPath = "";
-            //ローカルファイルのパスを表すURI
-            string uriPath = stTarget;
-            //Uriオブジェクトを作成する
-            Uri u = new Uri(uriPath);
-            //変換するURIがファイルを表していることを確認する
-            if (u.IsFile)
-            {
-                //Windows形式のパス表現に変換する
-                dllPath = u.LocalPath + Uri.UnescapeDataString(u.Fragment);
-            }
-            else
-            {
-                MessageBox.Show("ファイルURIではありません。");
-            }
-
-            dir = Path.GetDirectoryName(dllPath);
-            if (dir.Contains("2.0"))
-            {
-                //MessageBox.Show("BveEX 2.0 Mode");
-            }
-            else if (dir.Contains("Legacy"))
-            {
-                //MessageBox.Show("Legacy Mode");
-                dir = Path.GetFullPath(dir + @"\..\..\..\BveEx\2.0\Extensions");
-            }
-            else
-            {
-                //MessageBox.Show("AtsEX Mode");
-            }
-
-            string fileName = "シリアル出力エディタ";
-            string path = dir + @"\" + fileName + ".exe";
-            string pathV1_1 = dir + @"\" + fileName + "_V1.1.exe";
-
-            editorPath = path;
-            editorPathV1_1 = pathV1_1;
 
         }
 
-       
 
         private void Extensions_AllExtensionsLoaded(object sender, EventArgs e)
         {
-            string openedPortName = Open(portName, false);
             tsiOutput = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("SerialOutputEx 連動", SerialOutputEx_Change, ContextMenuItemType.CoreAndExtensions);
             tsiConsole = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("デバッグコンソール 表示", DebugConsoleDisp_Change, ContextMenuItemType.CoreAndExtensions);
             tsiOpenEditor = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("SerialOutputEx 設定", SerialOutputExEdit_Open, ContextMenuItemType.CoreAndExtensions);
+            //tsiStartingNotchSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("シナリオ開始時 ノッチ設定転送", SerialOutputExStartingNotchSet_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoBrakeSettings = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("自動ブレーキ帯 設定", null, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoBrakeSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ブレーキ帯 使用", AutoBrakeSet_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoAirEX = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("BveEX使用", AutoBrakeEX_Change, ContextMenuItemType.CoreAndExtensions);
+            //tsiAutoNotchFit = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ノッチ合わせ", AutoNotchFit_Change, ContextMenuItemType.CoreAndExtensions);
             tsiSettings = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("SerialOutputEx 設定", null, ContextMenuItemType.CoreAndExtensions);
-            //tsiSetSettingFile = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("設定ファイルの選択", SetSettingFile_Click, ContextMenuItemType.CoreAndExtensions);
+            tsiSetSettingFile = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("設定ファイルの選択", SetSettingFile_Click, ContextMenuItemType.CoreAndExtensions);
             tsiSeperator = Extensions.GetExtension<IContextMenuHacker>().AddSeparator(0);
-
-            if (Debug)
-            {
-                tsiConsole.Checked = true;
-            }
-            if (serialPort.IsOpen)
-            {
-                tsiOutput.Checked = true;
-            }
 
             //"シナリオを開く"イベント
             BveHacker.ScenarioOpened += BveHacker_ScenarioOpened;
@@ -130,32 +164,14 @@ namespace SerialOutputEx
 
             //0.3.31218.1 追記ここまで
 
-            try
-            {
-                if (File.Exists(editorPathV1_1))
-                {
-                    editorPath = editorPathV1_1;
-                }
-                else
-                {
-                    if (!File.Exists(editorPath))
-                    {
-                        tsiOpenEditor.Enabled = false;
-                        tsiOpenEditor.Text = "SerialOutputEx 設定 (シリアル出力エディタが見つかりません)";
-                    }
-                }
+            Task task = Open(portName, false);
 
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("例外:" + ex.Message);
-            }
         }
 
         private void SetSettingFile_Click(object sender, EventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog();
-            MessageBox.Show("鋭意実装中です");
+            MessageShow("鋭意実装中です");
             ofd.InitialDirectory = @"C:\";
             ofd.Filter = "XMLファイル(*.xml)|*.xml|すべてのファイル(*.*)|*.*";
             ofd.FilterIndex = 1;
@@ -180,8 +196,9 @@ namespace SerialOutputEx
             flgScenarioOpened = true;
             flgFirstSend = true;
         }
-
-        //シリアル出力エディタの起動
+        /// <summary>
+        /// シリアル出力エディタの起動
+        /// </summary>
         private void SerialOutputExEdit_Open(object sender, EventArgs e)
         {
             try
@@ -190,12 +207,13 @@ namespace SerialOutputEx
             }
             catch (Exception ex)
             {
-                MessageBox.Show("例外:" + ex.Message);
+                MessageShow("例外:" + ex.Message);
                 Dispose();
             }
         }
-
-        //ポート選択メニュー操作
+        /// <summary>
+        /// ポート選択メニュー操作
+        /// </summary>
         private void TsiPorts_Click(object sender, EventArgs e)
         {
             // sender にはクリックされたメニューの ToolStripMenuItem が入っている
@@ -224,23 +242,25 @@ namespace SerialOutputEx
                     serializer.Serialize(sw, outputInfo);
                     sw.Close();
 
-                    Open(portName,true);
+                    Task open = Open(portName, true);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message);
+                    MessageShow(ex.Message);
                 }
             }
         }
 
-        //シリアル出力(ON/OFF)メニュー変更
+        /// <summary>
+        /// シリアル出力(ON/OFF)メニュー変更
+        /// </summary>
         private void SerialOutputEx_Change(object sender, EventArgs e)
         {
             if (tsiOutput.Checked)
             {
                 if (!serialPort.IsOpen)
                 {
-                    Open(portName,false);
+                    Task open = Open(portName, false);
                 }
             }
             else
@@ -252,7 +272,38 @@ namespace SerialOutputEx
             }
         }
 
-        //デバッグコンソール表示(ON/OFF)変更
+        /// <summary>
+        /// 自動ブレーキ設定(ON/OFF)メニュー変更
+        /// </summary>
+        private void AutoBrakeSet_Change(object sender, EventArgs e)
+        {
+            flgAutoBrakeSetChange = true;
+            IsUseAutoBrake = tsiAutoBrakeSet.Checked;
+            Properties.Settings.Default.UseAutoBrake = IsUseAutoBrake;
+            tsiAutoAirEX.Enabled = IsUseAutoBrake;
+        }
+        /// <summary>
+        /// BveEX使用(On/Off)メニュー変更
+        /// </summary>
+       private void AutoBrakeEX_Change(object sender, EventArgs e)
+        {
+            flgAutoAirEXChange = true;
+            IsUseAutoAirEX = tsiAutoAirEX.Checked;
+            Properties.Settings.Default.UseAutoAirEX = IsUseAutoAirEX;
+        }
+
+        /// <summary>
+        /// ブレーキ段数自動設定(ON/OFF)メニュー変更
+        /// </summary>
+        /*private void AutoNotchFit_Change(object sender, EventArgs e)
+        {
+            flgAutoNotchFitChange = true;
+            IsUseAutoNotchFit = tsiAutoNotchFit.Checked;
+            Properties.Settings.Default.IsUseAutoNotchFit = IsUseAutoNotchFit;
+        }*/
+        /// <summary>
+        /// デバッグコンソール表示(ON/OFF)変更
+        /// </summary>
         private void DebugConsoleDisp_Change(object sender, EventArgs e)
         {
             Debug = tsiConsole.Checked;
@@ -276,7 +327,19 @@ namespace SerialOutputEx
             serializer.Serialize(sw, outputInfo);
             sw.Close();
         }
+        /// <summary>
+        /// シナリオ開始時 ノッチ設定転送 変更メソッド
+        /// </summary>
+        /*private void SerialOutputExStartingNotchSet_Change(object sender, EventArgs e)
+        {
+            IsStartingNotchSet = tsiStartingNotchSet.Checked;
+            Properties.Settings.Default.IsStartingNotchSet = IsStartingNotchSet;
 
+        }*/
+
+        /// <summary>
+        /// コンテクストメニューを開くイベント
+        /// </summary>
         private void ContextMenu_Opened(object sender, EventArgs e)
         {
             tsiSettings.DropDownItems.Clear();
@@ -285,10 +348,22 @@ namespace SerialOutputEx
             tsiSettings.DropDownItems.Add(tsiOpenEditor);
             tsiSettings.DropDownItems.Add(tss);
             tsiSettings.DropDownItems.Add(tsiConsole);
-            //tsiOpenEditor.DropDownItems.Add(tsiSetSettingFile);
+            //tsiSettings.DropDownItems.Add(tsiStartingNotchSet);
+            //tsiSettings.DropDownItems.Add(tsiAutoBrakeSettings);
+            //tsiSettings.DropDownItems.Add(tsiAutoNotchFit);
+            tsiOpenEditor.DropDownItems.Add(tsiSetSettingFile);
+            //tsiAutoBrakeSettings.DropDownItems.Add(tsiAutoBrakeSet);
+            //tsiAutoBrakeSettings.DropDownItems.Add(tsiAutoAirEX);
 
             tsiOutput.Enabled = !flgScenarioOpened;
             tsiOutput.Checked = serialPort.IsOpen;
+            tsiOutput.Text = serialPort.IsOpen ? "SerialOutputEx 連動 (" + serialPort.PortName + ")" : "SerialOutputEx 連動";
+
+            /*tsiStartingNotchSet.Enabled = tsiOutput.Checked;
+            tsiAutoBrakeSet.Enabled = tsiOutput.Checked;
+            tsiAutoNotchFit.Enabled = tsiOutput.Checked;
+            tsiAutoBrakeSettings.Enabled = tsiOutput.Checked;
+            tsiAutoAirEX.Enabled = tsiOutput.Checked;*/
 
             if (!flgScenarioOpened)
             {
@@ -309,7 +384,7 @@ namespace SerialOutputEx
                             // クリックイベントを追加
                             tsiPorts.Click += TsiPorts_Click;
                             //使用中ポートにチェック、Enableとする
-                            if ((_portName.Contains("("+serialPort.PortName+")")) && serialPort.IsOpen)
+                            if ((_portName.Contains("(" + serialPort.PortName + ")")) && serialPort.IsOpen)
                             {
                                 tsiPorts.Checked = true;
                                 tsiPorts.Enabled = false;
@@ -323,12 +398,18 @@ namespace SerialOutputEx
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show(ex.Message);
+                            MessageShow(ex.Message);
                         }
                     }
                 }
             }
         }
+
+        /// <summary>
+        /// コンテクストメニューのクリックイベント
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
         private void ContextMenu_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
         {
             //シナリオを閉じるメニューをクリックした時のイベント
@@ -337,8 +418,100 @@ namespace SerialOutputEx
                 flgScenarioOpened = false;
             }
         }
-        private string Open(string portName, bool anotherPortOpen)
+
+        /// <summary>
+        /// シリアル通信開始処理
+        /// </summary>
+        /// <param name="portName">ポート名</param>
+        /// <param name="anotherPortOpen">他のポートを開く場合の処理</param>
+        /// <returns></returns>
+        private async Task Open(string portName, bool anotherPortOpen)
         {
+            //初回起動時500ms遅延(Win11でMessageBoxがNullReferenceExceptionを起こす)
+            if (flgFirstBoot)
+            {
+                flgFirstBoot = false;
+                await Task.Delay(500);
+
+                string _stTarget = Assembly.GetExecutingAssembly().CodeBase;
+                string _dllPath = "";
+                //ローカルファイルのパスを表すURI
+                string _uriPath = _stTarget;
+                //Uriオブジェクトを作成する
+                Uri _u = new Uri(_uriPath);
+                //変換するURIがファイルを表していることを確認する
+                if (_u.IsFile)
+                {
+                    //Windows形式のパス表現に変換する
+                    _dllPath = _u.LocalPath + Uri.UnescapeDataString(_u.Fragment);
+                }
+                else
+                {
+                    MessageShow("ファイルURIではありません。");
+                }
+
+                dir = Path.GetDirectoryName(_dllPath);
+                if (dir.Contains("2.0"))
+                {
+                    //MessageBox.Show("BveEX 2.0 Mode");
+                }
+                else if (dir.Contains("Legacy"))
+                {
+                    //MessageBox.Show("Legacy Mode");
+                    dir = Path.GetFullPath(dir + @"\..\..\..\BveEx\2.0\Extensions");
+                }
+                else
+                {
+                    //MessageBox.Show("AtsEX Mode");
+                }
+
+
+                string fileName = "シリアル出力エディタ";
+                string path = dir + @"\" + fileName + ".exe";
+                string pathV1_1 = dir + @"\" + fileName + "_V1.1.exe";
+
+                editorPath = path;
+                editorPathV1_1 = pathV1_1;
+
+                try
+                {
+                    if (File.Exists(editorPathV1_1))
+                    {
+                        editorPath = editorPathV1_1;
+                    }
+                    else
+                    {
+                        if (!File.Exists(editorPath))
+                        {
+                            tsiOpenEditor.Enabled = false;
+                            tsiOpenEditor.Text = "SerialOutputEx 設定 (シリアル出力エディタが見つかりません)";
+                        }
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    MessageShow("例外:" + ex.Message);
+                }
+
+
+                IsStartingNotchSet = Properties.Settings.Default.IsStartingNotchSet;
+                IsUseAutoBrake = Properties.Settings.Default.UseAutoBrake;
+                IsUseAutoNotchFit = Properties.Settings.Default.IsUseAutoNotchFit;
+                IsUseAutoAirEX = Properties.Settings.Default.UseAutoAirEX;
+
+                /*tsiStartingNotchSet.Checked = IsStartingNotchSet;
+                tsiAutoBrakeSet.Checked = IsUseAutoBrake;
+                tsiAutoNotchFit.Checked = IsUseAutoNotchFit;
+                tsiAutoAirEX.Checked = IsUseAutoAirEX;
+
+                tsiStartingNotchSet.Enabled = tsiOutput.Checked;
+                tsiAutoBrakeSet.Enabled = tsiOutput.Checked;
+                tsiAutoNotchFit.Enabled = tsiOutput.Checked;
+                tsiAutoBrakeSettings.Enabled = tsiOutput.Checked;
+                tsiAutoAirEX.Enabled = tsiOutput.Checked;*/
+                //Properties.Settings.Default.Reload();
+            }
             string stTarget = Assembly.GetExecutingAssembly().CodeBase;
             string dllPath = "";
             //ローカルファイルのパスを表すURI
@@ -353,7 +526,7 @@ namespace SerialOutputEx
             }
             else
             {
-                MessageBox.Show("ファイルURIではありません。");
+                MessageShow("ファイルURIではありません。");
             }
 
             string xmldir = dir;
@@ -364,7 +537,7 @@ namespace SerialOutputEx
             {
                 if (!File.Exists(xmlpath))
                 {
-                    MessageBox.Show("設定ファイル " + xmlfileName + ".xml が見つかりません");　//0.2.31217.1 変更 設定ファイル名をdllと同じとする。
+                    MessageShow("設定ファイル " + xmlfileName + ".xml が見つかりません"); //0.2.31217.1 変更 設定ファイル名をdllと同じとする。
                 }
                 else
                 {
@@ -374,7 +547,7 @@ namespace SerialOutputEx
             }
             catch (IOException ex)
             {
-                MessageBox.Show("IOの例外:" + ex.Message);
+                MessageShow("IOの例外:" + ex.Message);
                 if (serialPort.IsOpen)
                 {
                     serialPort.Close();
@@ -384,7 +557,7 @@ namespace SerialOutputEx
             }
             catch (Exception ex)
             {
-                MessageBox.Show("例外:" + ex.Message);
+                MessageShow("例外:" + ex.Message);
                 Dispose();
             }
 
@@ -393,11 +566,26 @@ namespace SerialOutputEx
                 dc.Open();
                 flgConsoleOpened = true;
             }
+            if (Debug)
+            {
+                tsiConsole.Checked = true;
+            }
+            if (serialPort.IsOpen)
+            {
+                tsiOutput.Checked = true;
+            }
             dateTime = DateTime.Now;
-            return portName;
+            //return portName;
         }
 
-        private string OutputOpen(string path , string _portName , bool _anotherPortOpen)
+        /// <summary>
+        /// 設定XMLファイルを読込み、シリアル通信を開始sるメソッド
+        /// </summary>
+        /// <param name="path">設定XMLファイルパス</param>
+        /// <param name="_portName">ポート名</param>
+        /// <param name="_anotherPortOpen">他のポートを開く場合</param>
+        /// <returns></returns>
+        private string OutputOpen(string path, string _portName, bool _anotherPortOpen)
         {
 
             //XmlSerializerオブジェクトを作成
@@ -424,7 +612,7 @@ namespace SerialOutputEx
                 WriteTimeout = 1000,
                 ReadTimeout = 1000,
                 Handshake = Handshake.None,
-        })
+            })
                 serialPort.DataReceived += new SerialDataReceivedEventHandler(DataReceivedHandler);
 
             //同じを開くかポート番号がnullのとき
@@ -446,13 +634,13 @@ namespace SerialOutputEx
             {
                 serialPort.Open();
             }
-            catch(IOException)
+            catch (IOException)
             {
-                MessageBox.Show("シリアルポート "+ serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。" );
+                MessageShow("シリアルポート " + serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                MessageShow(ex.ToString());
             }
 
             return serialPort.PortName;
@@ -460,7 +648,7 @@ namespace SerialOutputEx
         }
 
         public override void Dispose()
-        { 
+        {
             //シリアルポートを閉じる
             //try
             //{
@@ -478,25 +666,65 @@ namespace SerialOutputEx
                 dc.Close();
                 flgConsoleOpened = false;
             }
+
+            Properties.Settings.Default.Save();
+
+            /*
+            if (flgBcChangeMode)
+            {
+                Patch.Invoked -= BcChangeHandler;
+            }
+            Patch.Dispose();*/
         }
 
         public override void Tick(TimeSpan elapsed)
         {
-
             if (serialPort.IsOpen)
             {
 
-                if (flgFirstSend)
+                if (flgFirstSend && IsStartingNotchSet)
                 {
-
+                    string strBrakeNotchCount = BveHacker.Scenario.Vehicle.Instruments.Cab.Handles.NotchInfo.BrakeNotchCount.ToString();
+                    string strPowerNotchCount = BveHacker.Scenario.Vehicle.Instruments.Cab.Handles.NotchInfo.PowerNotchCount.ToString();
+                    SerialWrite(serialPort, "WR 004 " + strBrakeNotchCount, "ブレーキ段数         WR 004 " + strBrakeNotchCount);
+                    SerialWrite(serialPort, "WR 072 " + strPowerNotchCount, "マスコンノッチ数     WR 072 " + strPowerNotchCount);
                     flgFirstSend = false;
+                }
+
+                if (flgAutoBrakeSetChange || flgAutoAirEXChange)
+                {
+                    if (serialPort.IsOpen)
+                    {
+
+                        int n = 0;
+                        string s0 = "無効";
+                        string s2 = "無効";
+                        if (IsUseAutoBrake) n |= (1 << 0); s0 = "有効";
+                        //if (cbRealAutoAir.Checked) n |= (1 << 1);
+                        if (IsUseAutoAirEX) n |= (1 << 2); s2 = "有効";
+                        SerialWrite(serialPort, "WR 068 " + n.ToString(), "自動ブレーキ" + s0 + "\r\nBveEX" + s2 + "            WR 068 " + n.ToString());
+                    }
+                    flgAutoBrakeSetChange = false;
+                    flgAutoAirEXChange = false;
+                }
+
+                if (flgAutoNotchFitChange)
+                {
+                    if (IsUseAutoNotchFit)
+                    {
+                        SerialWrite(serialPort, "WR 078 1", "自動ノッチ合わせ有効 WR 078 1");
+                    }
+                    else
+                    {
+                        SerialWrite(serialPort, "WR 078 0", "自動ノッチ合わせ無効 WR 078 0");
+                    }
+                    flgAutoNotchFitChange = false;
                 }
 
                 //If you want to change the Handle state, please access to Ats.Handle
                 HandleSet handles = BveHacker.Scenario.Vehicle.Instruments.Cab.Handles;
                 AtsPlugin ats = BveHacker.Scenario.Vehicle.Instruments.AtsPlugin;
                 VehicleStateStore vehicleStateStore = ats.StateStore;
-
 
                 //送信コマンド用
                 string str_send = "";
@@ -521,9 +749,16 @@ namespace SerialOutputEx
                 }
                 str_send_latch = str_send;
             }
-        }
 
-        //送信コマンド生成
+        }
+        /// <summary>
+        /// 送信コマンド生成
+        /// </summary>
+        /// <param name="_data"></param>
+        /// <param name="handles"></param>
+        /// <param name="ats"></param>
+        /// <param name="vehicleStateStore"></param>
+        /// <returns></returns>
         private string SendCommandGenerator(OutputInfoData _data, HandleSet handles, AtsPlugin ats, VehicleStateStore vehicleStateStore)
         {
             string str = "";
@@ -656,12 +891,28 @@ namespace SerialOutputEx
             {
                 string indata = sp.ReadLine();
                 ConsoleWrite("受信:" + indata);
-
-                /*if (indata.StartsWith("特定の文字列"))
+                /*if (indata.StartsWith("BC"))
                 {
-                    //"特定の文字列"で受信した場合の処理
+                    int.TryParse(indata.Substring(3), out targetBcValue);
                 }
-                */
+                if (indata.StartsWith("AAB"))
+                {
+                    int.TryParse(indata.Substring(4), out int eventBcChange);
+                    ConsoleWrite("BC" + eventBcChange.ToString());
+                    //BC変更シーケンス
+                    if (eventBcChange == 1)
+                    {
+                        flgBcChangeMode = true;
+                        Patch.Invoked += BcChangeHandler;
+                        ConsoleWrite("BC変更　設定");
+                    }
+                    else
+                    {
+                        flgBcChangeMode = false;
+                        Patch.Invoked -= BcChangeHandler;
+                        ConsoleWrite("BC変更　解除");
+                    }
+                }*/
             }
             catch
             {
@@ -687,6 +938,16 @@ namespace SerialOutputEx
         {
             SerialWrite(sp, command);
             ConsoleWrite(debug_command);
+        }
+        /// <summary>
+        /// メッセージダイアログ表示メソッド
+        /// </summary>
+        /// <param name="str"></param>
+        private void MessageShow(string str)
+        {
+            BveEx.Diagnostics.ErrorDialogInfo edi = new BveEx.Diagnostics.ErrorDialogInfo("SeldEX", "", str);
+            BveEx.Diagnostics.ErrorDialog.Show(edi);
+            //MessageBox.Show(str);
         }
 
     }
