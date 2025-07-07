@@ -77,7 +77,7 @@ SerialOutputプラグイン(シリアル出力エディタ.exeを含む)を[ダ�
 設置例  
 ![ExtentionsFiles](https://github.com/GraphTechKEN/SerialOutputEx/blob/image/ExtentionsFiles.png)
 
-設定例のファイルを同梱しています。SELDController詳細は[こちら](https://github.com/GraphTechKEN/SELDController/)
+設定例のファイルを同梱しています。使用例としてSELDControllerの詳細は[こちら](https://github.com/GraphTechKEN/SELDController/)
 
 ### 5. BveEX(AtsEX)の有効化
 BVEを起動し、ホーム画面の右クリック->設定メニュー->入力プラグイン->BveEX(旧AtsEX) にチェックマークを入れる(次回起動時以降は省略)
