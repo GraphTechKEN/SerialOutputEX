@@ -50,10 +50,10 @@ SerialOutputEXを開発いたしました。
 8. [動作確認、その他](https://github.com/GraphTechKEN/SerialOutputEx/tree/main?tab=readme-ov-file#8-%E5%8B%95%E4%BD%9C%E7%A2%BA%E8%AA%8D%E3%81%9D%E3%81%AE%E4%BB%96)
 
 ## 詳細
-### 1. BveEX入力デバイスプラグインのインストール
-[ダウンロードページ(おーとま様BveEXページ)](https://automatic9045.github.io/AtsEX/)から、最新の入力デバイスプラグイン版をインストールします。(exeインストーラ版を推奨)
-> [!TIP]
-> BveEXについては同ページをご確認ください。
+### 1. BveEXプラグインのインストール
+[おーとま様BveEX HP](https://automatic9045.github.io/)から、最新のBveEXをダウンロードしインストールします。(exeインストーラ版を推奨)
+> [!CAUTION]
+> ※BveEXの利用条件とライセンスについては同ページをご確認ください。
 
 ### 2. SerialOutputEXプラグインのダウンロード
   [こちら](https://github.com/GraphTechKEN/SerialOutputEx/releases)最新版リリース下部のAssetsから、「SerialOutputEx.BveEX.バージョン.zip」をダウンロードします。
