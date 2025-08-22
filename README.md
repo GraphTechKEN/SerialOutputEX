@@ -51,7 +51,7 @@ SerialOutputEXを開発いたしました。
 
 ## 詳細
 ### 1. BveEXプラグインのインストール
-[おーとま様BveEX HP](https://automatic9045.github.io/)から、最新のBveEXをダウンロードしインストールします。(exeインストーラ版を推奨)
+[おーとま様HP](https://bveex.okaoka-depot.com/)から、最新のBveEXをダウンロードしインストールします。(exeインストーラ版を推奨)
 > [!CAUTION]
 > ※BveEXの利用条件とライセンスについては同ページをご確認ください。
 
