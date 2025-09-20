@@ -630,19 +630,21 @@ namespace SerialOutputEx
             Debug = outputInfo.Debug;
 
             //シリアルポートを開く
-            try
+            if (tsiOutput.Checked)
             {
-                serialPort.Open();
+                try
+                {
+                    serialPort.Open();
+                }
+                catch (IOException)
+                {
+                    MessageShow("シリアルポート " + serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。");
+                }
+                catch (Exception ex)
+                {
+                    MessageShow(ex.ToString());
+                }
             }
-            catch (IOException)
-            {
-                MessageShow("シリアルポート " + serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。");
-            }
-            catch (Exception ex)
-            {
-                MessageShow(ex.ToString());
-            }
-
             return serialPort.PortName;
 
         }
