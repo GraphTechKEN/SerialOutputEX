@@ -62,6 +62,10 @@ namespace SerialOutputEx
         /// </summary>
         private ToolStripMenuItem tsiOpenEditor;
         /// <summary>
+        /// 接続エラー表示メニュー
+        /// </summary>
+        private ToolStripMenuItem tsiDispConnectError;
+        /// <summary>
         /// 開始時ノッチセットメニュー
         /// </summary>
         private ToolStripMenuItem tsiStartingNotchSet;
@@ -112,6 +116,7 @@ namespace SerialOutputEx
         private int targetBcValue = 0;
         private bool flgBcChangeMode = false;
         private bool flgFirstBoot = true;
+        private bool DispConnectError = true;
 
         public PluginMain(PluginBuilder builder) : base(builder)
         {
@@ -142,6 +147,7 @@ namespace SerialOutputEx
             tsiOutput = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("SerialOutputEx 連動", SerialOutputEx_Change, ContextMenuItemType.CoreAndExtensions);
             tsiConsole = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("デバッグコンソール 表示", DebugConsoleDisp_Change, ContextMenuItemType.CoreAndExtensions);
             tsiOpenEditor = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("SerialOutputEx 設定", SerialOutputExEdit_Open, ContextMenuItemType.CoreAndExtensions);
+            tsiDispConnectError = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("接続エラー表示", DispConnectError_Change, ContextMenuItemType.CoreAndExtensions);
             //tsiStartingNotchSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("シナリオ開始時 ノッチ設定転送", SerialOutputExStartingNotchSet_Change, ContextMenuItemType.CoreAndExtensions);
             //tsiAutoBrakeSettings = Extensions.GetExtension<IContextMenuHacker>().AddClickableMenuItem("自動ブレーキ帯 設定", null, ContextMenuItemType.CoreAndExtensions);
             //tsiAutoBrakeSet = Extensions.GetExtension<IContextMenuHacker>().AddCheckableMenuItem("自動ブレーキ帯 使用", AutoBrakeSet_Change, ContextMenuItemType.CoreAndExtensions);
@@ -166,6 +172,12 @@ namespace SerialOutputEx
 
             Task task = Open(portName, false);
 
+        }
+
+        private void DispConnectError_Change(object sender, EventArgs e)
+        {
+            DispConnectError = tsiDispConnectError.Checked;
+            Properties.Settings.Default.DispConnectError = DispConnectError;
         }
 
         private void SetSettingFile_Click(object sender, EventArgs e)
@@ -348,6 +360,7 @@ namespace SerialOutputEx
             tsiSettings.DropDownItems.Add(tsiOpenEditor);
             tsiSettings.DropDownItems.Add(tss);
             tsiSettings.DropDownItems.Add(tsiConsole);
+            tsiSettings.DropDownItems.Add(tsiDispConnectError);
             //tsiSettings.DropDownItems.Add(tsiStartingNotchSet);
             //tsiSettings.DropDownItems.Add(tsiAutoBrakeSettings);
             //tsiSettings.DropDownItems.Add(tsiAutoNotchFit);
@@ -630,17 +643,20 @@ namespace SerialOutputEx
             Debug = outputInfo.Debug;
 
             //シリアルポートを開く
-            if (tsiOutput.Checked)
+            try
             {
-                try
-                {
-                    serialPort.Open();
-                }
-                catch (IOException)
+                serialPort.Open();
+            }
+            catch (IOException)
+            {
+                if (DispConnectError)
                 {
                     MessageShow("シリアルポート " + serialPort.PortName + " が存在しません。\nシナリオ選択画面を閉じ、右クリックメニューの[SerialOutputEX 連動]メニューから別のポートを選択してください。");
                 }
-                catch (Exception ex)
+            }
+            catch (Exception ex)
+            {
+                if (DispConnectError)
                 {
                     MessageShow(ex.ToString());
                 }
